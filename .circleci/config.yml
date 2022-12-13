@@ -12,6 +12,8 @@ jobs:
       image: ubuntu-2204:2022.04.1
       docker_layer_caching: true
     environment:
+      DOCKER_BUILDKIT: 1
+      COMPOSE_DOCKER_CLI_BUILD: 1
       ECR_REPO: 427052161823.dkr.ecr.us-east-1.amazonaws.com/contentful/data/redash-redshift
     steps:
       - checkout
@@ -22,7 +24,7 @@ jobs:
       - run:
           name: Build image
           command: |
-            docker build -t $ECR_REPO:$CIRCLE_SHA1 .
+            docker build --build-arg skip_dev_deps=true -t $ECR_REPO:$CIRCLE_SHA1 .
             docker tag $ECR_REPO:$CIRCLE_SHA1 $ECR_REPO:<< parameters.imageTag >>
       - run:
           name: Publish image
