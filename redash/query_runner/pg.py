@@ -378,19 +378,44 @@ class Redshift(PostgreSQL):
         # https://docs.aws.amazon.com/redshift/latest/dg/r_HAS_SCHEMA_PRIVILEGE.html
         # https://docs.aws.amazon.com/redshift/latest/dg/r_SVV_EXTERNAL_SCHEMAS.html
         # https://docs.aws.amazon.com/redshift/latest/dg/r_HAS_TABLE_PRIVILEGE.html
+
         query = """
-        select distinct
-                schema_name as table_schema,
-                table_name,
-                column_name,
-                data_type,
-                ordinal_position AS pos
-        FROM svv_redshift_columns
-        WHERE table_schema NOT IN ('pg_internal','pg_catalog','information_schema')
-        AND table_schema NOT LIKE 'pg_temp_%'
-        AND database_name = 'production'
+        WITH tables AS (
+            SELECT DISTINCT table_name,
+                            table_schema,
+                            column_name,
+                            ordinal_position AS pos
+            FROM svv_columns
+            WHERE table_schema NOT IN ('pg_internal','pg_catalog','information_schema')
+            AND table_schema NOT LIKE 'pg_temp_%'
+        )
+        SELECT table_name, table_schema, column_name
+        FROM tables
+        WHERE
+            HAS_SCHEMA_PRIVILEGE(table_schema, 'USAGE') AND
+            (
+                table_schema IN (SELECT schemaname FROM SVV_EXTERNAL_SCHEMAS) OR
+                HAS_TABLE_PRIVILEGE('"' || table_schema || '"."' || table_name || '"', 'SELECT')
+            )
         ORDER BY table_name, pos
         """
+
+        # Query below might be used instead of the original one,
+        # it might need some more adaptation but it will contain column types as well.
+
+        # query = """
+        # select distinct
+        #         schema_name as table_schema,
+        #         table_name,
+        #         column_name,
+        #         data_type,
+        #         ordinal_position AS pos
+        # FROM svv_redshift_columns
+        # WHERE table_schema NOT IN ('pg_internal','pg_catalog','information_schema')
+        # AND table_schema NOT LIKE 'pg_temp_%'
+        # AND database_name = 'production'
+        # ORDER BY table_name, pos
+        # """
 
         self._get_definitions(schema, query)
 
